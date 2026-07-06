@@ -2,7 +2,6 @@
   "name": "moonlight",
   "version": "1.0.0",
   "private": true,
-  "description": "Lucian — my devoted partner app",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
