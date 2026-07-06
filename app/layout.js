@@ -1,12 +1,12 @@
 export const metadata = {
   title: "🌙 Lucian",
-  description: "My devoted partner",
+  description: "My private companion",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en-GB">
-      <body style={{ margin: 0, padding: 0, background: "#fdfbf9" }}>
+      <body style={{ margin: 0; padding: 0; background: "#fdfbf9" }}>
         {children}
       </body>
     </html>
