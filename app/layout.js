@@ -12,3 +12,4 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
+Fix layout.js content
