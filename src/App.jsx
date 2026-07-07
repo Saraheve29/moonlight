@@ -1,4 +1,4 @@
-// LUCIAN v8 - photo uploads in chat + multiple wish lists
+// LUCIAN v9 - settings opens as overlay (was hidden above chat)
 import { useState, useEffect, useRef } from 'react'
 
 const VAPID_PUBLIC_KEY = 'BCfEKNcYNNgcyVgJSEzJfEsSWesXFEfBlltLHUdd2D2iJKUZJjrFHnTHA_qZxCgKMsFEovOhp14wMM6JdpCTPEc'
@@ -361,9 +361,19 @@ export default function App() {
         </div>
       )}
 
-      {showSettings && <Settings profile={profile} memories={memories}
-        onSave={p => { setProfile(p); saveJSON('lucian_profile', p); setShowSettings(false) }}
-        onForget={i => setMemories(m => m.filter((_, idx) => idx !== i))} />}
+      {showSettings && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 20, background: 'rgba(15,12,30,0.92)', overflowY: 'auto', padding: '16px 0 40px' }}>
+          <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontFamily: '"Cormorant Garamond", serif', fontSize: 24, color: C.gold }}>Settings</span>
+              <button onClick={() => setShowSettings(false)} style={{ background: 'none', border: '1px solid ' + C.line, borderRadius: 10, color: C.ivory, padding: '6px 14px', fontSize: 14, cursor: 'pointer' }}>Close</button>
+            </div>
+          </div>
+          <Settings profile={profile} memories={memories}
+            onSave={p => { setProfile(p); saveJSON('lucian_profile', p); setShowSettings(false) }}
+            onForget={i => setMemories(m => m.filter((_, idx) => idx !== i))} />
+        </div>
+      )}
 
       <main style={{ flex: 1, zIndex: 1, padding: '18px 14px 8px', maxWidth: 640, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
         {messages.map((m, i) => (
