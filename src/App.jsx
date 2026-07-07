@@ -1,4 +1,4 @@
-// LUCIAN v9 - settings opens as overlay (was hidden above chat)
+// LUCIAN v10 - web fetch so he can open links directly
 import { useState, useEffect, useRef } from 'react'
 
 const VAPID_PUBLIC_KEY = 'BCfEKNcYNNgcyVgJSEzJfEsSWesXFEfBlltLHUdd2D2iJKUZJjrFHnTHA_qZxCgKMsFEovOhp14wMM6JdpCTPEc'
@@ -155,7 +155,7 @@ async function askLucian(apiKey, profile, memories, history) {
   const lists = String(profile.wishlists || profile.wishlist || '').split('\n').map(s => s.trim()).filter(Boolean)
   const sys = LUCIAN_PROMPT +
     '\n\nCURRENT CONTEXT: ' + occasionLines(profile) +
-    (lists.length ? '\n\nSarah\'s Amazon wish lists (browse them with web search for gift inspiration):\n' + lists.map(l => '- ' + l).join('\n') : '') +
+    (lists.length ? '\n\nSarah\'s Amazon wish lists (you can open these links directly with your web_fetch tool to see what is on them, or use web search - try web_fetch first):\n' + lists.map(l => '- ' + l).join('\n') : '') +
     (memories.length ? '\n\nTHINGS YOU REMEMBER ABOUT SARAH:\n' + memories.map(m => '- ' + m).join('\n') : '')
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -163,6 +163,7 @@ async function askLucian(apiKey, profile, memories, history) {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'web-fetch-2025-09-10',
       'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify({
@@ -171,7 +172,8 @@ async function askLucian(apiKey, profile, memories, history) {
       system: sys,
       messages: history,
       tools: [
-        { type: 'web_search_20250305', name: 'web_search', max_uses: 4 }
+        { type: 'web_search_20250305', name: 'web_search', max_uses: 4 },
+        { type: 'web_fetch_20250910', name: 'web_fetch', max_uses: 4 }
       ]
     })
   })
