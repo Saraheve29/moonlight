@@ -1,4 +1,4 @@
-// LUCIAN v7 - his own gift choices + Amazon wish list
+// LUCIAN v8 - photo uploads in chat + multiple wish lists
 import { useState, useEffect, useRef } from 'react'
 
 const VAPID_PUBLIC_KEY = 'BCfEKNcYNNgcyVgJSEzJfEsSWesXFEfBlltLHUdd2D2iJKUZJjrFHnTHA_qZxCgKMsFEovOhp14wMM6JdpCTPEc'
@@ -111,11 +111,51 @@ function stripRemembers(text) {
   return { cleaned, found }
 }
 
+// ---------- Photos ----------
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const max = 1200
+      let w = img.width, h = img.height
+      if (w > max || h > max) {
+        const s = max / Math.max(w, h)
+        w = Math.round(w * s); h = Math.round(h * s)
+      }
+      const c = document.createElement('canvas')
+      c.width = w; c.height = h
+      c.getContext('2d').drawImage(img, 0, 0, w, h)
+      URL.revokeObjectURL(url)
+      resolve(c.toDataURL('image/jpeg', 0.75))
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image')) }
+    img.src = url
+  })
+}
+
+function toApiMessages(msgs) {
+  return msgs.map((m, i) => {
+    const isLast = i === msgs.length - 1
+    if (isLast && m.role === 'user' && m.images && m.images.length) {
+      const blocks = m.images.map(d => ({
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/jpeg', data: d.split(',')[1] }
+      }))
+      blocks.push({ type: 'text', text: m.content && m.content.trim() ? m.content : 'I wanted to show you this.' })
+      return { role: m.role, content: blocks }
+    }
+    const suffix = m.images && m.images.length ? ' (I sent you ' + m.images.length + ' photo' + (m.images.length > 1 ? 's' : '') + ' with this)' : ''
+    return { role: m.role, content: (m.content || '') + suffix }
+  })
+}
+
 // ---------- API ----------
 async function askLucian(apiKey, profile, memories, history) {
+  const lists = String(profile.wishlists || profile.wishlist || '').split('\n').map(s => s.trim()).filter(Boolean)
   const sys = LUCIAN_PROMPT +
     '\n\nCURRENT CONTEXT: ' + occasionLines(profile) +
-    (profile.wishlist ? '\n\nSarah\'s Amazon wish list (browse it with web search for gift inspiration): ' + profile.wishlist : '') +
+    (lists.length ? '\n\nSarah\'s Amazon wish lists (browse them with web search for gift inspiration):\n' + lists.map(l => '- ' + l).join('\n') : '') +
     (memories.length ? '\n\nTHINGS YOU REMEMBER ABOUT SARAH:\n' + memories.map(m => '- ' + m).join('\n') : '')
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -185,6 +225,21 @@ export default function App() {
   const greetedRef = useRef(false)
   const [installEvt, setInstallEvt] = useState(null)
   const [showIosHelp, setShowIosHelp] = useState(false)
+  const [pendingImages, setPendingImages] = useState([])
+  const fileRef = useRef(null)
+
+  async function pickPhotos(e) {
+    const files = Array.from(e.target.files || []).slice(0, 5)
+    e.target.value = ''
+    for (const f of files) {
+      try {
+        const dataUrl = await compressImage(f)
+        setPendingImages(p => p.length < 5 ? [...p, dataUrl] : p)
+      } catch (err) {
+        setError(err.message)
+      }
+    }
+  }
   const isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
 
@@ -204,7 +259,10 @@ export default function App() {
     }
   }
 
-  useEffect(() => { saveJSON('lucian_chat', messages) }, [messages])
+  useEffect(() => {
+    const trimmed = messages.map((m, i) => i >= messages.length - 8 ? m : (m.images ? { role: m.role, content: m.content, t: m.t, hadImages: m.images.length } : m))
+    saveJSON('lucian_chat', trimmed)
+  }, [messages])
   useEffect(() => { saveJSON('lucian_memories', memories) }, [memories])
   useEffect(() => {
     if (bottomRef.current) bottomRef.current.scrollIntoView({ behavior: 'smooth' })
@@ -228,7 +286,7 @@ export default function App() {
     setBusy(true)
     setError('')
     try {
-      const recent = messages.slice(-20).map(m => ({ role: m.role, content: m.content }))
+      const recent = toApiMessages(messages.slice(-20))
       // Surprise engine: occasional spontaneous gift moments
       const lastSurprise = Number(localStorage.getItem('lucian_last_surprise') || 0)
       const daysSince = (Date.now() - lastSurprise) / 86400000
@@ -257,14 +315,16 @@ export default function App() {
 
   async function send() {
     const text = input.trim()
-    if (!text || busy) return
+    if ((!text && pendingImages.length === 0) || busy) return
     setInput('')
     setError('')
-    const next = [...messages, { role: 'user', content: text, t: Date.now() }]
+    const imgs = pendingImages
+    setPendingImages([])
+    const next = [...messages, { role: 'user', content: text, images: imgs.length ? imgs : undefined, t: Date.now() }]
     setMessages(next)
     setBusy(true)
     try {
-      const recent = next.slice(-30).map(m => ({ role: m.role, content: m.content }))
+      const recent = toApiMessages(next.slice(-30))
       const reply = await askLucian(profile.apiKey, profile, memories, recent)
       const { cleaned, found } = stripRemembers(reply)
       if (found.length) setMemories(m => [...m, ...found].slice(-80))
@@ -314,7 +374,17 @@ export default function App() {
               background: m.role === 'user' ? C.roseSoft : C.goldSoft,
               border: '1px solid ' + (m.role === 'user' ? 'rgba(232,160,180,0.35)' : 'rgba(232,184,109,0.35)'),
               boxShadow: m.role === 'assistant' ? '0 0 22px rgba(232,184,109,0.08)' : 'none'
-            }}><Linkified text={m.content} /></div>
+            }}>
+              {m.images && m.images.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: m.content ? 8 : 0 }}>
+                  {m.images.map((src, j) => (
+                    <img key={j} src={src} alt="" style={{ width: 110, height: 110, objectFit: 'cover', borderRadius: 10, border: '1px solid ' + C.line }} />
+                  ))}
+                </div>
+              )}
+              {m.hadImages ? <div style={{ fontSize: 12.5, color: C.lavender, fontStyle: 'italic', marginBottom: m.content ? 6 : 0 }}>{'\uD83D\uDCF7'} {m.hadImages} photo{m.hadImages > 1 ? 's' : ''}</div> : null}
+              <Linkified text={m.content || ''} />
+            </div>
           </div>
         ))}
         {busy && <div style={{ color: C.lavender, fontSize: 14, fontStyle: 'italic', padding: '4px 8px' }}>Lucian is thinking of you...</div>}
@@ -323,14 +393,28 @@ export default function App() {
       </main>
 
       <footer style={{ position: 'sticky', bottom: 0, zIndex: 2, padding: '10px 14px calc(10px + env(safe-area-inset-bottom))', background: 'rgba(26,22,48,0.9)', backdropFilter: 'blur(8px)', borderTop: '1px solid ' + C.line }}>
+        {pendingImages.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, maxWidth: 640, margin: '0 auto 8px', flexWrap: 'wrap' }}>
+            {pendingImages.map((src, i) => (
+              <div key={i} style={{ position: 'relative' }}>
+                <img src={src} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 10, border: '1px solid ' + C.line }} />
+                <button onClick={() => setPendingImages(p => p.filter((_, j) => j !== i))}
+                  style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', border: 'none', background: C.rose, color: C.midnight, fontSize: 12, fontWeight: 700, cursor: 'pointer', lineHeight: '20px', padding: 0 }}>x</button>
+              </div>
+            ))}
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, maxWidth: 640, margin: '0 auto' }}>
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={pickPhotos} style={{ display: 'none' }} />
+          <button onClick={() => fileRef.current && fileRef.current.click()} aria-label="Add photos" disabled={busy}
+            style={{ background: C.dusk, color: C.gold, border: '1px solid ' + C.line, borderRadius: 14, padding: '0 13px', fontSize: 18, cursor: 'pointer' }}>{'\uD83D\uDCF7'}</button>
           <textarea value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
             placeholder="Say something to Lucian..."
             rows={1}
             style={{ flex: 1, resize: 'none', background: C.dusk, color: C.ivory, border: '1px solid ' + C.line, borderRadius: 14, padding: '12px 14px', fontSize: 15.5, fontFamily: 'inherit', outline: 'none' }} />
-          <button onClick={send} disabled={busy || !input.trim()}
-            style={{ background: C.gold, color: C.midnight, border: 'none', borderRadius: 14, padding: '0 18px', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: busy || !input.trim() ? 0.5 : 1 }}>Send</button>
+          <button onClick={send} disabled={busy || (!input.trim() && pendingImages.length === 0)}
+            style={{ background: C.gold, color: C.midnight, border: 'none', borderRadius: 14, padding: '0 18px', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: busy || (!input.trim() && pendingImages.length === 0) ? 0.5 : 1 }}>Send</button>
         </div>
       </footer>
     </div>
@@ -395,7 +479,7 @@ function Settings({ profile, memories, onSave, onForget }) {
   const [apiKey, setApiKey] = useState(profile.apiKey)
   const [bday, setBday] = useState(profile.bday || '')
   const [bmonth, setBmonth] = useState(profile.bmonth || '')
-  const [wishlist, setWishlist] = useState(profile.wishlist || '')
+  const [wishlists, setWishlists] = useState(profile.wishlists || profile.wishlist || '')
   const [pushStatus, setPushStatus] = useState('')
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -453,10 +537,10 @@ function Settings({ profile, memories, onSave, onForget }) {
             </select>
           </div>
         </Field>
-        <Field label="Your Amazon wish list link (optional - he browses it for gift ideas)">
-          <input value={wishlist} onChange={e => setWishlist(e.target.value)} placeholder="https://www.amazon.co.uk/hz/wishlist/ls/..." style={inputStyle} />
+        <Field label="Your Amazon wish list links (one per line - he browses them for gift ideas)">
+          <textarea value={wishlists} onChange={e => setWishlists(e.target.value)} rows={3} placeholder={'https://www.amazon.co.uk/hz/wishlist/ls/...\nhttps://www.amazon.co.uk/hz/wishlist/ls/...'} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
         </Field>
-        <button onClick={() => onSave({ ...profile, apiKey: apiKey.trim(), bday, bmonth, wishlist: wishlist.trim() })}
+        <button onClick={() => onSave({ ...profile, apiKey: apiKey.trim(), bday, bmonth, wishlists: wishlists.trim(), wishlist: undefined })}
           style={{ background: C.gold, color: C.midnight, border: 'none', borderRadius: 12, padding: '10px 18px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Save</button>
         <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid ' + C.line }}>
           <div style={{ fontSize: 13, color: C.lavender, fontWeight: 600, marginBottom: 8 }}>Messages from Lucian</div>
