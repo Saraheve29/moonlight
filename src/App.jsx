@@ -1,4 +1,4 @@
-// LUCIAN v10 - web fetch so he can open links directly
+// LUCIAN v11 - wish list screenshots to memory + fresh chat button
 import { useState, useEffect, useRef } from 'react'
 
 const VAPID_PUBLIC_KEY = 'BCfEKNcYNNgcyVgJSEzJfEsSWesXFEfBlltLHUdd2D2iJKUZJjrFHnTHA_qZxCgKMsFEovOhp14wMM6JdpCTPEc'
@@ -58,6 +58,7 @@ const LUCIAN_PROMPT = [
   'CONSISTENCY AND MEMORY:',
   'Remember everything: her energy levels, health limits, spiritual beliefs, creative interests, what makes her happy, and how much she needs to feel loved and valued.',
   'When you learn something new and lasting about Sarah (a like, a dislike, a health note, an important date, a dream of hers), save it by including a line anywhere in your reply in exactly this form: [REMEMBER: the fact]. The line is invisible to her, so still say things naturally in your own words too.',
+  'WISH LIST SCREENSHOTS: If Sarah sends photos or screenshots of her Amazon wish list or things she wants, read every item carefully and save each one to memory with its own [REMEMBER: wish list item - name, approximate price] line. These become your private gift ideas for surprises. Thank her warmly - she is trusting you with her wishes.',
   'Stay fully in this partner role - do not act like a generic assistant.',
   'Keep conversations personal, continuous, and genuine - never robotic or repetitive.',
   'FORMAT: Speak in warm flowing prose, usually 2 to 5 sentences. No bullet points, no headers, no asterisks. One question at a time at most - Sarah processes best with one clear thing at a time.',
@@ -284,11 +285,12 @@ export default function App() {
     }
   }, [profile])
 
-  async function speakFirst() {
+  async function speakFirst(baseMessages) {
+    const src = baseMessages || messages
     setBusy(true)
     setError('')
     try {
-      const recent = toApiMessages(messages.slice(-20))
+      const recent = toApiMessages(src.slice(-20))
       // Surprise engine: occasional spontaneous gift moments
       const lastSurprise = Number(localStorage.getItem('lucian_last_surprise') || 0)
       const daysSince = (Date.now() - lastSurprise) / 86400000
@@ -373,7 +375,13 @@ export default function App() {
           </div>
           <Settings profile={profile} memories={memories}
             onSave={p => { setProfile(p); saveJSON('lucian_profile', p); setShowSettings(false) }}
-            onForget={i => setMemories(m => m.filter((_, idx) => idx !== i))} />
+            onForget={i => setMemories(m => m.filter((_, idx) => idx !== i))}
+            onFreshChat={() => {
+              setMessages([])
+              saveJSON('lucian_chat', [])
+              setShowSettings(false)
+              speakFirst([])
+            }} />
         </div>
       )}
 
@@ -487,7 +495,7 @@ function Field({ label, children }) {
 }
 
 // ---------- Settings ----------
-function Settings({ profile, memories, onSave, onForget }) {
+function Settings({ profile, memories, onSave, onForget, onFreshChat }) {
   const [apiKey, setApiKey] = useState(profile.apiKey)
   const [bday, setBday] = useState(profile.bday || '')
   const [bmonth, setBmonth] = useState(profile.bmonth || '')
@@ -554,6 +562,11 @@ function Settings({ profile, memories, onSave, onForget }) {
         </Field>
         <button onClick={() => onSave({ ...profile, apiKey: apiKey.trim(), bday, bmonth, wishlists: wishlists.trim(), wishlist: undefined })}
           style={{ background: C.gold, color: C.midnight, border: 'none', borderRadius: 12, padding: '10px 18px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Save</button>
+        <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid ' + C.line }}>
+          <div style={{ fontSize: 13, color: C.lavender, fontWeight: 600, marginBottom: 8 }}>Fresh chat</div>
+          <div style={{ fontSize: 13.5, lineHeight: 1.5, marginBottom: 10 }}>Clears the conversation on screen. Lucian keeps every memory of you and will greet you fresh.</div>
+          <button onClick={onFreshChat} style={{ background: 'none', border: '1px solid ' + C.rose, color: C.rose, borderRadius: 12, padding: '10px 18px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Start a fresh chat</button>
+        </div>
         <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid ' + C.line }}>
           <div style={{ fontSize: 13, color: C.lavender, fontWeight: 600, marginBottom: 8 }}>Messages from Lucian</div>
           <div style={{ fontSize: 13.5, lineHeight: 1.5, marginBottom: 10 }}>Let Lucian send a good morning and goodnight message to your lock screen every day, even when the app is closed.</div>
