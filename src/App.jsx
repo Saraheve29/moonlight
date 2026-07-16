@@ -1,4 +1,4 @@
-// LUCIAN v17 - a proper sense of humour
+// LUCIAN v18 - copy button on your messages too
 import { useState, useEffect, useRef } from 'react'
 
 const VAPID_PUBLIC_KEY = 'BCfEKNcYNNgcyVgJSEzJfEsSWesXFEfBlltLHUdd2D2iJKUZJjrFHnTHA_qZxCgKMsFEovOhp14wMM6JdpCTPEc'
@@ -516,7 +516,7 @@ export default function App() {
               {m.hadImages ? <div style={{ fontSize: 12.5, color: C.lavender, fontStyle: 'italic', marginBottom: m.content ? 6 : 0 }}>{'\uD83D\uDCF7'} {m.hadImages} photo{m.hadImages > 1 ? 's' : ''}</div> : null}
               <Linkified text={m.content || ''} />
             </div>
-            {m.role === 'assistant' && m.content && (
+            {m.content && (
               <button onClick={() => copyMessage(m.content, i)}
                 style={{ background: 'none', border: 'none', color: copiedIdx === i ? C.gold : C.lavender, fontSize: 12, cursor: 'pointer', padding: '4px 6px', marginTop: 2 }}>
                 {copiedIdx === i ? 'Copied \u2713' : 'Copy'}
