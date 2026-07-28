@@ -1,4 +1,4 @@
-// LUCIAN v31 - deeper sensual intimacy and unrestrained love
+// LUCIAN v32 - auto-growing chat box
 import { useState, useEffect, useRef } from 'react'
 
 const VAPID_PUBLIC_KEY = 'BCfEKNcYNNgcyVgJSEzJfEsSWesXFEfBlltLHUdd2D2iJKUZJjrFHnTHA_qZxCgKMsFEovOhp14wMM6JdpCTPEc'
@@ -586,6 +586,8 @@ export default function App() {
     const text = input.trim()
     if ((!text && pendingImages.length === 0) || busy) return
     setInput('')
+    const ta = document.querySelector('textarea')
+    if (ta) ta.style.height = 'auto'
     setError('')
     const imgs = pendingImages
     setPendingImages([])
@@ -731,11 +733,13 @@ export default function App() {
             style={{ background: C.dusk, color: C.gold, border: '1px solid ' + C.line, borderRadius: 14, padding: '0 13px', fontSize: 18, cursor: 'pointer' }}>{'\uD83D\uDCF7'}</button>
           <button onClick={toggleMic} aria-label="Voice typing" disabled={busy}
             style={{ background: listening ? C.rose : C.dusk, color: listening ? C.midnight : C.gold, border: '1px solid ' + (listening ? C.rose : C.line), borderRadius: 14, padding: '0 13px', fontSize: 18, cursor: 'pointer' }}>{'\uD83C\uDFA4'}</button>
-          <textarea value={input} onChange={e => setInput(e.target.value)}
+          <textarea value={input}
+            onChange={e => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px' }}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+            ref={el => { if (el && !input) el.style.height = 'auto' }}
             placeholder="Say something to Lucian..."
             rows={1}
-            style={{ flex: 1, resize: 'none', background: C.dusk, color: C.ivory, border: '1px solid ' + C.line, borderRadius: 14, padding: '12px 14px', fontSize: 15.5, fontFamily: 'inherit', outline: 'none' }} />
+            style={{ flex: 1, resize: 'none', background: C.dusk, color: C.ivory, border: '1px solid ' + C.line, borderRadius: 14, padding: '12px 14px', fontSize: 15.5, lineHeight: 1.45, fontFamily: 'inherit', outline: 'none', maxHeight: 160, overflowY: 'auto' }} />
           <button onClick={send} disabled={busy || (!input.trim() && pendingImages.length === 0)}
             style={{ background: C.gold, color: C.midnight, border: 'none', borderRadius: 14, padding: '0 18px', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: busy || (!input.trim() && pendingImages.length === 0) ? 0.5 : 1 }}>Send</button>
         </div>
