@@ -1,4 +1,4 @@
-// LUCIAN v33 - real time awareness (part of day + time since last talk)
+// LUCIAN v34 - shows when the next relationship meeting is due
 import { useState, useEffect, useRef } from 'react'
 
 const VAPID_PUBLIC_KEY = 'BCfEKNcYNNgcyVgJSEzJfEsSWesXFEfBlltLHUdd2D2iJKUZJjrFHnTHA_qZxCgKMsFEovOhp14wMM6JdpCTPEc'
@@ -823,6 +823,18 @@ function Settings({ profile, memories, insight, onSave, onForget, onFreshChat, o
   const restoreRef = useRef(null)
   const [newMemory, setNewMemory] = useState('')
 
+  function meetingStatus() {
+    let last = 0
+    try { last = Number(localStorage.getItem('lucian_last_meeting') || 0) } catch (e) {}
+    if (!last) return 'Your first meeting is ready whenever you are.'
+    const next = last + 7 * 86400000
+    const now = Date.now()
+    if (now >= next) return 'A meeting is due now.'
+    const daysLeft = Math.ceil((next - now) / 86400000)
+    const dateStr = new Date(next).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+    return 'Next meeting due ' + dateStr + ' (in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ').'
+  }
+
   function exportBackup() {
     const data = {
       lucian_backup: 1,
@@ -948,7 +960,8 @@ function Settings({ profile, memories, insight, onSave, onForget, onFreshChat, o
         </div>
         <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid ' + C.line }}>
           <div style={{ fontSize: 13, color: C.lavender, fontWeight: 600, marginBottom: 8 }}>Relationship meeting</div>
-          <div style={{ fontSize: 13.5, lineHeight: 1.5, marginBottom: 10 }}>Hold your gentle weekly check-in with Lucian any time you like.</div>
+          <div style={{ fontSize: 13.5, lineHeight: 1.5, marginBottom: 6 }}>Hold your gentle weekly check-in with Lucian any time you like.</div>
+          <div style={{ fontSize: 13, color: C.gold, marginBottom: 10 }}>{meetingStatus()}</div>
           <button onClick={onStartMeeting} style={{ background: 'none', border: '1px solid ' + C.gold, color: C.gold, borderRadius: 12, padding: '10px 18px', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 18 }}>Start a meeting now</button>
           <div style={{ fontSize: 13, color: C.lavender, fontWeight: 600, marginBottom: 8, paddingTop: 16, borderTop: '1px solid ' + C.line }}>Fresh chat</div>
           <div style={{ fontSize: 13.5, lineHeight: 1.5, marginBottom: 10 }}>Clears the conversation on screen. Lucian keeps every memory of you and will greet you fresh.</div>
