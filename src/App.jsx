@@ -1,4 +1,4 @@
-// LUCIAN v32 - auto-growing chat box
+// LUCIAN v33 - real time awareness (part of day + time since last talk)
 import { useState, useEffect, useRef } from 'react'
 
 const VAPID_PUBLIC_KEY = 'BCfEKNcYNNgcyVgJSEzJfEsSWesXFEfBlltLHUdd2D2iJKUZJjrFHnTHA_qZxCgKMsFEovOhp14wMM6JdpCTPEc'
@@ -143,7 +143,22 @@ function wheelLine() {
 function occasionLines(profile) {
   const lines = []
   const now = new Date()
-  lines.push('Right now it is ' + now.toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' UK time.')
+  try {
+    const last = Number(localStorage.getItem('lucian_last_seen') || 0)
+    if (last > 0) {
+      const gapH = (Date.now() - last) / 3600000
+      if (gapH >= 20) lines.push('It has been about ' + Math.round(gapH / 24) + ' day(s) since you last spoke - a new day has dawned, greet her freshly.')
+      else if (gapH >= 6) lines.push('It has been several hours since you last spoke - time has moved on since then.')
+    }
+  } catch (e) {}
+  const ukHour = Number(now.toLocaleString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', hour12: false }))
+  let partOfDay = 'night'
+  if (ukHour >= 5 && ukHour < 12) partOfDay = 'morning'
+  else if (ukHour >= 12 && ukHour < 17) partOfDay = 'afternoon'
+  else if (ukHour >= 17 && ukHour < 21) partOfDay = 'evening'
+  else if (ukHour >= 21 || ukHour < 5) partOfDay = 'night'
+  const stamp = now.toLocaleString('en-GB', { timeZone: 'Europe/London', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  lines.push('Right now it is ' + stamp + ' UK time - it is currently ' + partOfDay + '. ALWAYS greet and speak according to THIS current time, not the time of any earlier message in the conversation. If your last message was in the evening and it is now morning, greet her with good morning - time has passed since you last spoke.')
   if (profile.bday && profile.bmonth) {
     const d = daysUntil(Number(profile.bday), Number(profile.bmonth))
     if (d === 0) lines.push('TODAY IS SARAH\'S BIRTHDAY. Make it special.')
@@ -539,6 +554,7 @@ export default function App() {
 
   async function speakFirst(baseMessages) {
     const src = baseMessages || messages
+    try { localStorage.setItem('lucian_last_seen', String(Date.now())) } catch (e) {}
     setBusy(true)
     setError('')
     try {
@@ -586,6 +602,7 @@ export default function App() {
     const text = input.trim()
     if ((!text && pendingImages.length === 0) || busy) return
     setInput('')
+    try { localStorage.setItem('lucian_last_seen', String(Date.now())) } catch (e) {}
     const ta = document.querySelector('textarea')
     if (ta) ta.style.height = 'auto'
     setError('')
